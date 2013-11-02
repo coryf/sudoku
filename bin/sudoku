@@ -19,7 +19,7 @@ GRID_CHARS_FILE = DATA_PATH.join('grid_chars.yml')
 def init_screen
   Curses.noecho # do not show typed keys
   Curses.init_screen
-  Curses.crmode
+  Curses.cbreak
   Curses.curs_set(0)
   Curses.stdscr.keypad(true) # enable arrow keys
   begin
