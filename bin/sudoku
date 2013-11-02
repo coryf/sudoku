@@ -1,0 +1,53 @@
+#!/usr/bin/env ruby -w
+
+require 'yaml'
+require 'curses'
+require 'pathname'
+
+bin_file = Pathname.new(__FILE__)
+
+$LOAD_PATH << bin_file.join('../../lib')
+DATA_PATH = bin_file.join('../../data')
+
+require 'board'
+require 'board_data_file'
+require 'board_view'
+
+DATA_FILE       = DATA_PATH.join('sudoku17')
+GRID_CHARS_FILE = DATA_PATH.join('grid_chars.yml')
+
+def init_screen
+  Curses.noecho # do not show typed keys
+  Curses.init_screen
+  Curses.crmode
+  Curses.curs_set(0)
+  Curses.stdscr.keypad(true) # enable arrow keys
+  begin
+    yield
+  ensure
+    Curses.close_screen
+  end
+end
+
+grid_chars = YAML.load_file(GRID_CHARS_FILE)
+boards = BoardDataFile.new(DATA_FILE)
+
+init_screen do
+  board = Board.new(boards.first)
+  view = BoardView.new(board, grid_chars)
+
+  loop do
+    Curses.setpos(0, 0)
+    Curses.addstr(view.render)
+    Curses.refresh
+
+    ch = Curses.getch
+    case ch
+    when 'k', Curses::Key::UP    then board.move(-1, 0)
+    when 'j', Curses::Key::DOWN  then board.move( 1, 0)
+    when 'l', Curses::Key::RIGHT then board.move( 0, 1)
+    when 'h', Curses::Key::LEFT  then board.move( 0,-1)
+    when 'q' then break
+    end
+  end
+end
