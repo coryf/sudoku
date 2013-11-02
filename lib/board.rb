@@ -1,15 +1,16 @@
 class Board
   attr_reader :block_size
 
-  CHAR_TO_BITMASK = Hash[16.times.map { |x| [x.to_s, 1 << (x - 1) ] }]
+  CHAR_TO_BITMASK = Hash[32.times.map { |x| [x.to_s, 1 << (x - 1) ] }]
   BITMASK_TO_CHAR = CHAR_TO_BITMASK.invert
   BITMASK_TO_NUM  = Hash[BITMASK_TO_CHAR.map { |k, v| [k, v.to_i] }]
 
   def initialize(data)
     @cursor = [0, 0]
-    @board = data.scan(/\d/).map { |x| CHAR_TO_BITMASK[x] }.each_slice(9)
-    @block_size = 3
-    @grid_size = @block_size ** 2
+    data = data.chomp
+    @row_size = Math.sqrt(data.size).to_i
+    @block_size = Math.sqrt(@row_size).to_i
+    @board = data.scan(/\d/).map { |x| CHAR_TO_BITMASK[x] }.each_slice(@row_size)
   end
 
   def move(*offsets)
@@ -28,6 +29,6 @@ class Board
   private
 
   def range_coerce(val)
-    [[0, val].max, @grid_size - 1].min
+    [[0, val].max, @row_size - 1].min
   end
 end
