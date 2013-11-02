@@ -4,22 +4,14 @@ class BoardDataFile
   extend Enumerable
   extend Forwardable
 
-  def_delegators :@data, :size, :first
+  def_delegators :@data, :size, :each, :first, :[]
 
   def initialize(filename)
-    @data = File.readlines(filename)
-  end
-
-  def each
-    @data.lazy.map(&:chomp).each
-  end
-
-  def [](index)
-    @data[index].chomp
+    @data = File.readlines(filename).lazy.map(&:chomp)
   end
 
   def random
-    @data[rand(@data.size)].chomp
+    self[rand(size)]
   end
 end
 

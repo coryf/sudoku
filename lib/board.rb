@@ -7,7 +7,6 @@ class Board
 
   def initialize(data)
     @cursor = [0, 0]
-    data = data.chomp
     @row_size = Math.sqrt(data.size).to_i
     @block_size = Math.sqrt(@row_size).to_i
     @board = data.scan(/\d/).map { |x| CHAR_TO_BITMASK[x] }.each_slice(@row_size)
