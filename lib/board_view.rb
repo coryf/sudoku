@@ -35,10 +35,14 @@ class BoardView
     blocks.join("\n#{middle_line}\n")
   end
 
+  def cursor_available
+    board.available(*board.cursor).join(',').center(@bottom_line.size)
+  end
+
   def render
     board_lines = board.each_num_row.map.with_index { |line, row| render_line(line, row) }
     board_chars = render_middle_lines(board_lines)
-    [top_line, board_chars, bottom_line].join("\n")
+    [top_line, board_chars, bottom_line, cursor_available].join("\n")
   end
 
   private
