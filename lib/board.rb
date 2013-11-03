@@ -167,6 +167,17 @@ class Board
     end
   end
 
+  def each_cell
+    return to_enum(:each_cell) unless block_given?
+
+    @board.each_with_index do |line, row|
+      line.each_with_index do |cell, col|
+        yield [cell, row, col]
+      end
+    end
+
+  end
+
   def each_in_block(row, col)
     return to_enum(:each_in_block, row, col).map(&:first) unless block_given?
 
