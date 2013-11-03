@@ -61,7 +61,7 @@ def render
   Curses.refresh
 end
 
-def autosolve_boards
+def autosolve_boards(max_boards = nil)
   start_time = Time.now
   Curses.timeout = 0
   seen_count = 0
@@ -90,9 +90,9 @@ def autosolve_boards
       do_render = false
     end
 
-    unless board_change(1)
-      break
-    end
+    break if max_boards && @view.board_number >= max_boards
+
+    break unless board_change(1)
 
     ch = Curses.getch
     break if ch == 'q'
@@ -124,6 +124,7 @@ loop do
   when 'n' then board_change(1)
   when 'p' then board_change(-1)
   when 'a' then autosolve_boards
+  when 't' then autosolve_boards(500)
   when 'q' then break
   end
 end
