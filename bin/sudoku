@@ -46,8 +46,10 @@ end
 
 def board_change(offset)
   board_number = @view.board_number + offset
-  @view.board = @board = Board.new(@boards[board_number])
-  @view.board_number = board_number
+  if (0...@boards.size).cover? board_number
+    @view.board = @board = Board.new(@boards[board_number])
+    @view.board_number = board_number
+  end
 end
 
 def render
@@ -87,7 +89,10 @@ def autosolve_boards
       render
       do_render = false
     end
-    board_change(1)
+
+    unless board_change(1)
+      break
+    end
 
     ch = Curses.getch
     break if ch == 'q'
