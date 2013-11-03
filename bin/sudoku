@@ -12,6 +12,17 @@ DATA_PATH = bin_file.join('../../data')
 require 'board'
 require 'board_data_file'
 require 'board_view'
+require 'optparse'
+
+SCRIPT_ARGS = $*.reject { |arg| arg =~ /\A--restarted/ }
+
+options = {}
+OptionParser.new do |o|
+  o.on('--restarted', 'Internal - Trigger restart message') do
+    options[:message] = '==Restarted=='
+  end
+end.parse!
+
 
 DATA_FILE       = DATA_PATH.join('sudoku17')
 GRID_CHARS_FILE = DATA_PATH.join('grid_chars.yml')
@@ -29,24 +40,70 @@ def init_screen
   end
 end
 
-grid_chars = YAML.load_file(GRID_CHARS_FILE)
-boards = BoardDataFile.new(DATA_FILE)
+def restart!
+  exec [$0, '--restarted', *SCRIPT_ARGS].join(' ')
+end
+
+def board_change(offset)
+  board_number = @view.board_number + offset
+  @view.board = @board = Board.new(@boards[board_number])
+  @view.board_number = board_number
+end
+
+def render
+  Curses.setpos(0, 0)
+  Curses.addstr(@view.render)
+  Curses.addstr("\n")
+  Curses.clrtoeol
+  Curses.addstr(@message) if defined?(@message)
+  Curses.refresh
+end
+
+def autosolve_boards
+  Curses.timeout = 0
+  seen_count = 0
+  solved_count = 0
+  loop do
+    seen_count += 1
+    while @board.iterate_solution
+      render
+    end
+
+    solved_count += 1 if @board.solved?
+    percent_solved = "%03.1f" % (solved_count * 100.0 / seen_count)
+    @message = "Solved #{percent_solved}% #{solved_count}/#{seen_count}"
+    render
+    board_change(1)
+
+    ch = Curses.getch
+    break if ch == 'q'
+  end
+  Curses.timeout = -1
+end
+
+@grid_chars = YAML.load_file(GRID_CHARS_FILE)
+@boards = BoardDataFile.new(DATA_FILE)
 
 init_screen do
-  board = Board.new(boards.first)
-  view = BoardView.new(board, grid_chars)
+  @board = Board.new(@boards.first)
+  @view = BoardView.new(@board, @grid_chars)
+  @view.message = options[:message]
+  @view.board_number = 1
 
   loop do
-    Curses.setpos(0, 0)
-    Curses.addstr(view.render)
-    Curses.refresh
+    render
 
     ch = Curses.getch
     case ch
-    when 'k', Curses::Key::UP    then board.move(-1, 0)
-    when 'j', Curses::Key::DOWN  then board.move( 1, 0)
-    when 'l', Curses::Key::RIGHT then board.move( 0, 1)
-    when 'h', Curses::Key::LEFT  then board.move( 0,-1)
+    when 'k', Curses::Key::UP    then @board.move(-1, 0)
+    when 'j', Curses::Key::DOWN  then @board.move( 1, 0)
+    when 'l', Curses::Key::RIGHT then @board.move( 0, 1)
+    when 'h', Curses::Key::LEFT  then @board.move( 0,-1)
+    when 'i' then @board.iterate_solution
+    when 'r' then restart!
+    when 'n' then board_change(1)
+    when 'p' then board_change(-1)
+    when 'a' then autosolve_boards
     when 'q' then break
     end
   end

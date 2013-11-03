@@ -7,7 +7,7 @@ class BoardDataFile
   def_delegators :@data, :size, :each, :first, :[]
 
   def initialize(filename)
-    @data = File.readlines(filename).lazy.map(&:chomp)
+    @data = File.readlines(filename).map(&:chomp).to_a
   end
 
   def random
