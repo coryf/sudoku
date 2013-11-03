@@ -1,5 +1,10 @@
 #!/usr/bin/env ruby -w
 
+at_exit do
+  puts 'EXITING'
+  Curses.close_screen
+end
+
 require 'yaml'
 require 'curses'
 require 'pathname'
@@ -28,16 +33,11 @@ DATA_FILE       = DATA_PATH.join('sudoku17')
 GRID_CHARS_FILE = DATA_PATH.join('grid_chars.yml')
 
 def init_screen
-  Curses.noecho # do not show typed keys
   Curses.init_screen
+  Curses.noecho # do not show typed keys
   Curses.cbreak
   Curses.curs_set(0)
   Curses.stdscr.keypad(true) # enable arrow keys
-  begin
-    yield
-  ensure
-    Curses.close_screen
-  end
 end
 
 def restart!
@@ -60,19 +60,33 @@ def render
 end
 
 def autosolve_boards
+  start_time = Time.now
   Curses.timeout = 0
   seen_count = 0
   solved_count = 0
+  boards_per_sec = 0
+  next_duration_update = 0
+  updates_per_sec = 2
+  do_render = true
   loop do
     seen_count += 1
     while @board.iterate_solution
-      render
+      #render
     end
 
     solved_count += 1 if @board.solved?
-    percent_solved = "%03.1f" % (solved_count * 100.0 / seen_count)
-    @message = "Solved #{percent_solved}% #{solved_count}/#{seen_count}"
-    render
+    percent_solved = (solved_count * 100.0 / seen_count)
+    if seen_count > next_duration_update
+      duration = Time.now - start_time
+      boards_per_sec = seen_count / duration
+      next_duration_update = seen_count + (boards_per_sec / updates_per_sec)
+      do_render = true
+    end
+    @message = "Solved %03.1f%% %d/%d %0.1f/sec" % [percent_solved, solved_count, seen_count, boards_per_sec]
+    if do_render
+      render
+      do_render = false
+    end
     board_change(1)
 
     ch = Curses.getch
@@ -84,27 +98,27 @@ end
 @grid_chars = YAML.load_file(GRID_CHARS_FILE)
 @boards = BoardDataFile.new(DATA_FILE)
 
-init_screen do
-  @board = Board.new(@boards.first)
-  @view = BoardView.new(@board, @grid_chars)
-  @view.message = options[:message]
-  @view.board_number = 1
+init_screen
 
-  loop do
-    render
+@board = Board.new(@boards.first)
+@view = BoardView.new(@board, @grid_chars)
+@view.message = options[:message]
+@view.board_number = 1
 
-    ch = Curses.getch
-    case ch
-    when 'k', Curses::Key::UP    then @board.move(-1, 0)
-    when 'j', Curses::Key::DOWN  then @board.move( 1, 0)
-    when 'l', Curses::Key::RIGHT then @board.move( 0, 1)
-    when 'h', Curses::Key::LEFT  then @board.move( 0,-1)
-    when 'i' then @board.iterate_solution
-    when 'r' then restart!
-    when 'n' then board_change(1)
-    when 'p' then board_change(-1)
-    when 'a' then autosolve_boards
-    when 'q' then break
-    end
+loop do
+  render
+
+  ch = Curses.getch
+  case ch
+  when 'k', Curses::Key::UP    then @board.move(-1, 0)
+  when 'j', Curses::Key::DOWN  then @board.move( 1, 0)
+  when 'l', Curses::Key::RIGHT then @board.move( 0, 1)
+  when 'h', Curses::Key::LEFT  then @board.move( 0,-1)
+  when 'i' then @board.iterate_solution
+  when 'r' then restart!
+  when 'n' then board_change(1)
+  when 'p' then board_change(-1)
+  when 'a' then autosolve_boards
+  when 'q' then break
   end
 end
