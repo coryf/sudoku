@@ -53,4 +53,11 @@ class BoardPossibilities
   def [](row, col)
     @possibilities[row][col]
   end
+
+  def unique(row, col)
+    cell = @possibilities[row][col]
+    if cell != 0 && Board::BITMASK_TO_NUM[cell]
+      cell
+    end
+  end
 end
