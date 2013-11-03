@@ -34,10 +34,7 @@ class BoardPossibilities
 
   def cell_possibilities(row, col)
     block = board.block_from_position(row, col)
-    ~( @row_taken[row] |
-       @col_taken[col] |
-       @block_taken[block]
-     ) & @mask
+    ~( @row_taken[row] | @col_taken[col] | @block_taken[block] ) & @mask
   end
 
   def [](row, col)

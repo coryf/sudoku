@@ -69,7 +69,14 @@ class BoardView
   def render
     board_lines = board.each_num_row.map.with_index { |line, row| render_line(line, row) }
     board_chars = render_middle_lines(board_lines)
-    [title_line, top_line, board_chars, bottom_line, status_lines.flatten].join("\n")
+
+    [
+      title_line,
+      top_line,
+      board_chars,
+      bottom_line,
+      status_lines.flatten
+    ].join("\n")
   end
 
   private
