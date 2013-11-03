@@ -9,6 +9,18 @@ class BoardPossibilities
   end
 
   def recalculate
+    @row_taken = board.row_size.times.map do |row|
+      board.each_in_row(row).reduce(:|)
+    end
+
+    @col_taken = board.row_size.times.map do |col|
+      board.each_in_col(col).reduce(:|)
+    end
+
+    @block_taken = Hash[board.each_block.map do |block|
+      [block, board.each_in_block(*block).reduce(:|)]
+    end]
+
     @possibilities = board.row_size.times.map do |row|
       board.row_size.times.map do |col|
         if board[row, col] == 0
@@ -21,9 +33,10 @@ class BoardPossibilities
   end
 
   def cell_possibilities(row, col)
-    ~( board.each_in_row(row).reduce(:|) |
-      board.each_in_col(col).reduce(:|) |
-      board.each_in_block(row, col).reduce(:|)
+    block = board.block_from_position(row, col)
+    ~( @row_taken[row] |
+       @col_taken[col] |
+       @block_taken[block]
      ) & @mask
   end
 
