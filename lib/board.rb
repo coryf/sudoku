@@ -31,37 +31,27 @@ class Board
   end
 
   def iterate_solution
-    cell_found = false
-
-    each_position do |row, col|
+    found = each_position.any? do |row, col|
       if cell = find_only_available(row, col)
-        cell_found = found_cell(row, col, cell, 'Last available')
-        break
-      end
-
-      if cell = find_only_possible_block(row, col)
-        cell_found = found_cell(row, col, cell, 'Block elimination')
-        break
-      end
-
-      if cell = find_only_possible_row(row, col)
-        cell_found = found_cell(row, col, cell, 'Row elimination')
-        break
-      end
-
-      if cell = find_only_possible_col(row, col)
-        cell_found = found_cell(row, col, cell, 'Col elimination')
-        break
+        break [row, col, cell, 'Last available']
+      elsif cell = find_only_possible_block(row, col)
+        break [row, col, cell, 'Block elimination']
+      elsif cell = find_only_possible_row(row, col)
+        break [row, col, cell, 'Row elimination']
+      elsif cell = find_only_possible_col(row, col)
+        break [row, col, cell, 'Col elimination']
       end
     end
 
-    if cell_found
-      @possibilities.recalculate
+    if found
+      row, col, cell, message = found
+      found_cell(row, col, cell, message)
+      @possibilities.cell_taken(row, col, cell)
     else
       @last_message = "Additional cell not found."
     end
 
-    cell_found
+    !!found
   end
 
   def find_only_available(row, col)
@@ -175,7 +165,6 @@ class Board
         yield [cell, row, col]
       end
     end
-
   end
 
   def each_in_block(row, col)
