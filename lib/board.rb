@@ -1,3 +1,5 @@
+require 'board_possibilities'
+
 class Board
   attr_reader :block_size, :row_size, :cursor, :last_message
 
@@ -9,21 +11,12 @@ class Board
     @cursor = [0, 0]
     @row_size = Math.sqrt(data.size).to_i
     @block_size = Math.sqrt(@row_size).to_i
-    @available_mask = (1 << (@row_size)) - 1
     @board = data.scan(/\d/).map { |x| CHAR_TO_BITMASK[x] }.each_slice(@row_size).to_a
-    reset_available
+    @possibilities = BoardPossibilities.new(self)
   end
 
-  def reset_available
-    @available = @row_size.times.map do |row|
-      @row_size.times.map do |col|
-        if @board[row][col] == 0
-          cell_available(row, col)
-        else
-          0
-        end
-      end
-    end
+  def [](row, col)
+    @board[row][col]
   end
 
   def solved?
@@ -63,7 +56,7 @@ class Board
     end
 
     if cell_found
-      reset_available
+      @possibilities.recalculate
     else
       @last_message = "Additional cell not found."
     end
@@ -72,64 +65,57 @@ class Board
   end
 
   def find_only_available(row, col)
-    cell = @available[row][col]
+    cell = @possibilities[row, col]
     if cell != 0 && BITMASK_TO_NUM[cell]
       cell
     end
   end
 
   def find_only_possible_block(row, col)
-    mask = @available[row][col]
+    mask = @possibilities[row, col]
     each_block_position(row, col) do |block_row, block_col|
       unless [row, col] == [block_row, block_col]
-        available = @available[block_row][block_col]
+        available = @possibilities[block_row, block_col]
         mask &= ~available
       end
     end
-    cell = mask & @available_mask
+    cell = mask & @possibilities.mask
 
     cell if cell != 0
   end
 
   def find_only_possible_row(row, col)
-    mask = @available[row][col]
+    mask = @possibilities[row, col]
     @row_size.times do |block_col|
       unless col == block_col
-        available = @available[row][block_col]
+        available = @possibilities[row, block_col]
         mask &= ~available
       end
     end
-    cell = mask & @available_mask
+    cell = mask & @possibilities.mask
 
     cell if cell != 0
   end
 
   def find_only_possible_col(row, col)
-    mask = @available[row][col]
+    mask = @possibilities[row, col]
     @row_size.times do |block_row|
       unless row == block_row
-        available = @available[block_row][col]
+        available = @possibilities[block_row, col]
         mask &= ~available
       end
     end
-    cell = mask & @available_mask
+    cell = mask & @possibilities.mask
 
     cell if cell != 0
   end
 
   def available_mask(row, col)
-    @available[row][col]
+    @possibilities[row, col]
   end
 
   def cell_mask(row, col)
     @board[row][col]
-  end
-
-  def cell_available(row, col)
-    ~( each_in_row(row).reduce(:|) |
-       each_in_col(col).reduce(:|) |
-       each_in_block(row, col).reduce(:|)
-     ) & @available_mask
   end
 
   def each_in_row(row)
@@ -140,11 +126,26 @@ class Board
     @board.map { |line| line[col] }
   end
 
+  def each_block
+    return to_enum(:each_block) unless block_given?
+
+    (0...@row_size).step(@block_size) do |row|
+      (0...@row_size).step(@block_size) do |col|
+        yield [row, col]
+      end
+    end
+  end
+
+  def block_from_position(row, col)
+    row_start = (row / @block_size) * @block_size
+    col_start = (col / @block_size) * @block_size
+    [row_start, col_start]
+  end
+
   def each_block_position(row, col)
     return to_enum(:each_block_position, row, col).map(&:first) unless block_given?
 
-    row_start = (row / @block_size) * @block_size
-    col_start = (col / @block_size) * @block_size
+    row_start, col_start = block_from_position(row, col)
 
     row_end = row_start + @block_size
     col_end = col_start + @block_size
@@ -184,7 +185,7 @@ class Board
   end
 
   def available(row, col)
-    mask = @available[row][col]
+    mask = @possibilities[row, col]
     (0...@row_size).select { |x| mask[x] != 0 }.map(&:succ)
   end
 
