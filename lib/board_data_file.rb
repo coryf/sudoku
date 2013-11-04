@@ -14,6 +14,12 @@ class BoardDataFile
     self[rand(size)]
   end
 
+  def find(number)
+    if (1..size).cover? number
+      self[number - 1]
+    end
+  end
+
   def self.export_sparse_data(board)
     offset, pack_row = board.row_size > 16 ? [8, 'CS*'] : [4, 'CC*']
     rows = board.each_num_row.with_index.map do |line, row|

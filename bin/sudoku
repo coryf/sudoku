@@ -19,14 +19,13 @@ require 'board_data_file'
 require 'board_view'
 require 'optparse'
 
-SCRIPT_ARGS = $*.reject { |arg| arg =~ /\A--restarted/ }
-
 options = {}
-OptionParser.new do |o|
+option_parser = OptionParser.new do |o|
   o.on('--restarted', 'Internal - Trigger restart message') do
     options[:message] = '==Restarted=='
   end
-end.parse!
+end
+options[:board_number] = option_parser.parse!.first
 
 
 DATA_FILE       = DATA_PATH.join('sudoku17')
@@ -40,14 +39,17 @@ def init_screen
   Curses.stdscr.keypad(true) # enable arrow keys
 end
 
-def restart!
-  exec [$0, '--restarted', *SCRIPT_ARGS].join(' ')
+def restart!(options)
+  args = ARGV.reject { |arg| arg =~ /\A--restarted/ }
+  args.pop if args.last == options[:board_number].to_s
+
+  exec [$0, '--restarted', *args, @view.board_number].join(' ')
 end
 
 def board_change(offset)
   board_number = @view.board_number + offset
-  if (0...@boards.size).cover? board_number
-    @view.board = @board = Board.new(@boards[board_number])
+  if board_data = @boards.find(board_number)
+    @view.board = @board = Board.new(board_data)
     @view.board_number = board_number
   end
 end
@@ -111,10 +113,11 @@ end
 
 init_screen
 
-@board = Board.new(@boards.first)
+board_number = (options[:board_number] || 1).to_i
+@board = Board.new(@boards.find(board_number))
 @view = BoardView.new(@board, @grid_chars)
 @view.message = options[:message]
-@view.board_number = 1
+@view.board_number = board_number
 
 loop do
   render
@@ -126,11 +129,11 @@ loop do
   when 'l', Curses::Key::RIGHT then @board.move( 0, 1)
   when 'h', Curses::Key::LEFT  then @board.move( 0,-1)
   when 'i' then @board.iterate_solution
-  when 'r' then restart!
+  when 'r' then restart!(options)
   when 'n' then board_change(1)
   when 'p' then board_change(-1)
   when 'a' then autosolve_boards
-  when 't' then autosolve_boards(max_boards: 500)
+  when 't' then autosolve_boards(max_boards: 1000)
   when 'q' then break
   end
 end
