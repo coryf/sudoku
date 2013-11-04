@@ -14,6 +14,7 @@ class BoardView
     self.board = board
 
     @message = nil
+    @debug = []
   end
 
   def board=(board)
@@ -80,7 +81,9 @@ class BoardView
       ]
     end
 
-    [message] + lines.map(&:to_s).map { |l| l.center(@bottom_line.size) }
+    [message] +
+      lines.map(&:to_s).map { |l| l.center(@bottom_line.size) } +
+      @debug.map { |l| l.ljust(@bottom_line.size) }
   end
 
   def render
@@ -92,8 +95,12 @@ class BoardView
       top_line,
       board_chars,
       bottom_line,
-      status_lines.flatten
+      status_lines(masks: true).flatten
     ].join("\n")
+  end
+
+  def debug(message)
+    @debug << (message.is_a?(String) ? message : message.inspect)
   end
 
   private
