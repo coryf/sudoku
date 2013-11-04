@@ -30,17 +30,24 @@ class Board
     true
   end
 
+  SOLVERS = [
+    [:find_only_possible_cell,  'Last available'],
+    [:find_only_possible_block, 'Block elimination'],
+    [:find_only_possible_row,   'Row elimination'],
+    [:find_only_possible_col,   'Col elimination'],
+  ]
+
   def iterate_solution
-    found = each_position.any? do |row, col|
-      if cell = find_only_possible_cell(row, col)
-        break [row, col, cell, 'Last available']
-      elsif cell = find_only_possible_block(row, col)
-        break [row, col, cell, 'Block elimination']
-      elsif cell = find_only_possible_row(row, col)
-        break [row, col, cell, 'Row elimination']
-      elsif cell = find_only_possible_col(row, col)
-        break [row, col, cell, 'Col elimination']
+    found = nil
+    each_position do |row, col|
+      SOLVERS.each do |method, message|
+        if cell = send(method, row, col)
+          found = [row, col, cell, message]
+          break
+        end
       end
+
+      break if found
     end
 
     if found
