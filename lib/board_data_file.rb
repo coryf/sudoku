@@ -16,9 +16,9 @@ class BoardDataFile
 
   def self.export_sparse_data(board)
     offset, pack_row = board.row_size > 16 ? [8, 'CS*'] : [4, 'CC*']
-    rows = board.row_size.times.map do |row|
-      cols = board.each_in_row(row).with_index.select { |cell, _| cell != 0 }
-      row = cols.map { |cell, col| col << offset | (Board::BITMASK_TO_NUM[cell] - 1) }
+    rows = board.each_num_row.with_index.map do |line, row|
+      cols = line.with_index.select { |cell, _| cell != 0 }
+      row = cols.map { |cell, col| (col << offset) | (cell - 1) }
       [row.size, *row].pack(pack_row)
     end
     [board.row_size].pack('C') + rows.join('')

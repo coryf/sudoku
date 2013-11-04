@@ -184,7 +184,11 @@ class Board
   end
 
   def each_num_row
-    @board.map { |line| line.map { |x| BITMASK_TO_NUM[x] } }
+    return to_enum(:each_num_row) unless block_given?
+
+    @board.each do |line|
+      yield line.map { |x| BITMASK_TO_NUM[x] }.each
+    end
   end
 
   private

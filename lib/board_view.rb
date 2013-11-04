@@ -56,14 +56,31 @@ class BoardView
     "Board ##{@board_number}".center(@top_line.size)
   end
 
-  def status_lines
-    [(message_once || board.last_message).to_s.ljust(@bottom_line.size)] +
-    [
+  def status_lines(options = {})
+    message = message_once || board.last_message
+    message = message.to_s.ljust(@bottom_line.size)
+
+    lines = [
       board.solved? ? 'Solved!' : '',
       board.available(*board.cursor).join(','),
-      ("%09b" % board.available_mask(*board.cursor)),
-      ("%09b" % board.cell_mask(*board.cursor).to_i),
-    ].map(&:to_s).map { |l| l.center(@bottom_line.size) }
+    ]
+
+    if options[:masks]
+      lines += [
+        ("%09b" % board.available_mask(*board.cursor)),
+        ("%09b" % board.cell_mask(*board.cursor).to_i),
+      ]
+    end
+
+    if options[:sparse]
+      lines += [
+        BoardDataFile.export_sparse_data(board).each_byte.size,
+        BoardDataFile.export_sparse_data(board).each_byte.map { |x| "%02x" % x }.join('|'),
+        BoardDataFile.import_sparse_data(BoardDataFile.export_sparse_data(board)).inspect,
+      ]
+    end
+
+    [message] + lines.map(&:to_s).map { |l| l.center(@bottom_line.size) }
   end
 
   def render
