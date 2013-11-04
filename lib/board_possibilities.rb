@@ -36,7 +36,7 @@ class BoardPossibilities
   def update_possibilities
     @possibilities = board.row_size.times.map do |row|
       board.row_size.times.map do |col|
-        if board[row, col] == 0
+        if board.cell_mask(row, col) == 0
           cell_possibilities(row, col)
         else
           0

@@ -32,7 +32,7 @@ class Board
 
   def iterate_solution
     found = each_position.any? do |row, col|
-      if cell = find_unique_possibility(row, col)
+      if cell = find_only_possible_cell(row, col)
         break [row, col, cell, 'Last available']
       elsif cell = find_only_possible_block(row, col)
         break [row, col, cell, 'Block elimination']
@@ -54,7 +54,7 @@ class Board
     !!found
   end
 
-  def find_unique_possibility(row, col)
+  def find_only_possible_cell(row, col)
     @possibilities.unique(row, col)
   end
 
@@ -62,8 +62,7 @@ class Board
     mask = @possibilities[row, col]
     each_block_position(row, col) do |block_row, block_col|
       unless [row, col] == [block_row, block_col]
-        available = @possibilities[block_row, block_col]
-        mask &= ~available
+        mask &= ~@possibilities[block_row, block_col]
       end
     end
     cell = mask & @possibilities.mask
@@ -75,8 +74,7 @@ class Board
     mask = @possibilities[row, col]
     @row_size.times do |block_col|
       unless col == block_col
-        available = @possibilities[row, block_col]
-        mask &= ~available
+        mask &= ~@possibilities[row, block_col]
       end
     end
     cell = mask & @possibilities.mask
@@ -88,8 +86,7 @@ class Board
     mask = @possibilities[row, col]
     @row_size.times do |block_row|
       unless row == block_row
-        available = @possibilities[block_row, col]
-        mask &= ~available
+        mask &= ~@possibilities[block_row, col]
       end
     end
     cell = mask & @possibilities.mask
