@@ -31,10 +31,14 @@ class Board
   end
 
   SOLVERS = [
-    [:find_only_possible_cell,  'Last available'],
-    [:find_only_possible_block, 'Block elimination'],
-    [:find_only_possible_row,   'Row elimination'],
-    [:find_only_possible_col,   'Col elimination'],
+    [:find_last_possible_cell,  'Last available'],
+    [:find_last_position_block, 'Block elimination'],
+    [:find_last_position_row,   'Row elimination'],
+    [:find_last_position_col,   'Col elimination'],
+  ]
+
+  REDUCER = [
+    :block_vector_reduction,
   ]
 
   def iterate_solution
@@ -52,17 +56,71 @@ class Board
   def each_solution
     return to_enum(:each_solution) unless block_given?
 
-    begin
+    loop do
       found = false
-      SOLVERS.each do |method, message|
+      SOLVERS.each do |solver, message|
         each_position do |row, col|
-          if cell = send(method, row, col)
+          if cell = send(solver, row, col)
             found = true
             yield row, col, cell, message
           end
         end
       end
-    end while found
+
+      unless found || solved?
+        reduced = false
+        REDUCER.each { |r| break if reduced = send(r) }
+        redo if reduced
+      end
+
+      break unless found
+    end
+  end
+
+  def block_vector_reduction
+    reduced = false
+    each_block do |block|
+      @row_availables = Hash.new(0)
+      @col_availables = Hash.new(0)
+      each_block_position(*block) do |row, col|
+        @row_availables[row] |= @possibilities[row, col]
+        @col_availables[col] |= @possibilities[row, col]
+      end
+
+      block_rows = @row_availables.keys
+      block_cols = @col_availables.keys
+
+      # block row reduction
+      @row_availables.each do |row, availables|
+        other_availables = @row_availables.select { |r, _| r != row }.map(&:last)
+        other_availables = other_availables.reduce(:|)
+        exclusives = (availables ^ other_availables) & availables
+        if exclusives != 0
+          ((0...@row_size).to_a - block_cols).each do |col|
+            if cell_empty?(row, col)
+              #logit([:row, row, col, "%09b" % availables, "%09b" % other_availables, "%09b" % exclusives, block_cols])
+              reduced ||= @possibilities.remove(row, col, exclusives)
+            end
+          end
+        end
+      end
+
+      # block col reduction
+      @col_availables.each do |col, availables|
+        other_availables = @col_availables.select { |r, _| r != col }.map(&:last)
+        other_availables = other_availables.reduce(:|)
+        exclusives = (availables ^ other_availables) & availables
+        if exclusives != 0
+          ((0...@row_size).to_a - block_rows).each do |row|
+            if cell_empty?(row, col)
+              #logit([:col, row, col, "%09b" % availables, "%09b" % other_availables, "%09b" % exclusives, block_rows])
+              reduced ||= @possibilities.remove(row, col, exclusives)
+            end
+          end
+        end
+      end
+    end
+    reduced
   end
 
   def solve
@@ -72,11 +130,11 @@ class Board
     end
   end
 
-  def find_only_possible_cell(row, col)
+  def find_last_possible_cell(row, col)
     @possibilities.unique(row, col)
   end
 
-  def find_only_possible_block(row, col)
+  def find_last_position_block(row, col)
     mask = @possibilities[row, col]
     each_block_position(row, col) do |block_row, block_col|
       unless [row, col] == [block_row, block_col]
@@ -88,7 +146,7 @@ class Board
     cell if cell != 0
   end
 
-  def find_only_possible_row(row, col)
+  def find_last_position_row(row, col)
     mask = @possibilities[row, col]
     @row_size.times do |block_col|
       unless col == block_col
@@ -100,7 +158,7 @@ class Board
     cell if cell != 0
   end
 
-  def find_only_possible_col(row, col)
+  def find_last_position_col(row, col)
     mask = @possibilities[row, col]
     @row_size.times do |block_row|
       unless row == block_row

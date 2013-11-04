@@ -40,6 +40,13 @@ class BoardPossibilities
     update
   end
 
+  def remove(row, col, remove_mask)
+    possible = @possibilities[row][col]
+    @possibilities[row][col] = (possible & ~remove_mask) & @mask
+
+    @possibilities[row][col] != possible
+  end
+
   def update
     @possibilities.each_with_index do |line, row|
       line.each_with_index do |possible, col|
