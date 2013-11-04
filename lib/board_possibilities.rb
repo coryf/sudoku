@@ -5,7 +5,14 @@ class BoardPossibilities
   def initialize(board)
     @board = board
     @mask = (1 << (board.row_size)) - 1
+    everythings_possible!
     recalculate
+  end
+
+  def everythings_possible!
+    @possibilities = board.row_size.times.map do |row|
+      board.row_size.times.map { |col| @mask }
+    end
   end
 
   def recalculate
@@ -21,23 +28,23 @@ class BoardPossibilities
       [block, board.each_in_block(*block).reduce(:|)]
     end]
 
-    update_possibilities
+    update
   end
 
-  def cell_taken(row, col, cell)
+  def take!(row, col, cell)
     block = board.block_from_position(row, col)
     @row_taken[row]     |= cell
     @col_taken[col]     |= cell
     @block_taken[block] |= cell
 
-    update_possibilities
+    update
   end
 
-  def update_possibilities
-    @possibilities = board.row_size.times.map do |row|
-      board.row_size.times.map do |col|
-        if board.cell_mask(row, col) == 0
-          cell_possibilities(row, col)
+  def update
+    @possibilities.each_with_index do |line, row|
+      line.each_with_index do |possible, col|
+        @possibilities[row][col] = if board.cell_empty?(row, col)
+          possible & ~taken(row, col)
         else
           0
         end
@@ -45,9 +52,9 @@ class BoardPossibilities
     end
   end
 
-  def cell_possibilities(row, col, block = nil)
+  def taken(row, col, block = nil)
     block ||= board.block_from_position(row, col)
-    ~( @row_taken[row] | @col_taken[col] | @block_taken[block] ) & @mask
+    @row_taken[row] | @col_taken[col] | @block_taken[block]
   end
 
   def [](row, col)

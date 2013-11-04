@@ -41,7 +41,7 @@ class Board
     if found = each_solution.first
       row, col, cell, message = found
       found_cell(row, col, cell, message)
-      @possibilities.cell_taken(row, col, cell)
+      @possibilities.take!(row, col, cell)
     else
       @last_message = "Additional cell not found."
     end
@@ -68,7 +68,7 @@ class Board
   def solve
     each_solution do |row, col, cell, _|
       @board[row][col] = cell
-      @possibilities.cell_taken(row, col, cell)
+      @possibilities.take!(row, col, cell)
     end
   end
 
@@ -118,6 +118,10 @@ class Board
 
   def cell_mask(row, col)
     @board[row][col]
+  end
+
+  def cell_empty?(row, col)
+    @board[row][col] == 0
   end
 
   def each_in_row(row)
