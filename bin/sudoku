@@ -69,6 +69,7 @@ def autosolve_boards(max_boards = nil)
   boards_per_sec = 0
   next_duration_update = 0
   updates_per_sec = 2
+  duration = 0.0
   do_render = true
   loop do
     seen_count += 1
@@ -84,7 +85,10 @@ def autosolve_boards(max_boards = nil)
       next_duration_update = seen_count + (boards_per_sec / updates_per_sec)
       do_render = true
     end
-    @message = "Solved %03.1f%% %d/%d %0.1f/sec" % [percent_solved, solved_count, seen_count, boards_per_sec]
+
+    @message = "Solved %03.1f%% %d/%d %0.1f/s %0.1fs" % 
+      [percent_solved, solved_count, seen_count, boards_per_sec, duration]
+
     if do_render
       render
       do_render = false
