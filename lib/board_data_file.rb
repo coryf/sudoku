@@ -44,4 +44,3 @@ class BoardDataFile
   end
 
 end
-

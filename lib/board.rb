@@ -39,8 +39,8 @@ class Board
 
   def iterate_solution
     found = nil
-    each_position do |row, col|
-      SOLVERS.each do |method, message|
+    SOLVERS.each do |method, message|
+      each_position do |row, col|
         if cell = send(method, row, col)
           found = [row, col, cell, message]
           break

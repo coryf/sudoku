@@ -113,4 +113,3 @@ class BoardView
     left + line.join(delim) + right
   end
 end
-
