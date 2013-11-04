@@ -15,48 +15,31 @@ class BoardDataFile
   end
 
   def self.export_sparse_data(board)
-    [board.row_size].pack('C') +
-      if board.row_size < 16
-        board.row_size.times.map do |row|
-          board.row_size.times.map do |col|
-            cell = board[row, col]
-            next if cell == 0
-            [col << 4 | Board::BITMASK_TO_NUM[cell]].pack('C')
-          end.compact.join('') + "\0"
-        end.join('')
-      else
-        board.row_size.times.map do |row|
-          board.row_size.times.map do |col|
-            cell = board[row, col]
-            next if cell == 0
-            [col, Board::BITMASK_TO_NUM[cell]].pack('CC')
-          end.compact.join('') + "\0"
-        end.join('')
-      end
+    offset, pack_row = board.row_size > 16 ? [8, 'CS*'] : [4, 'CC*']
+    rows = board.row_size.times.map do |row|
+      cols = board.each_in_row(row).with_index.select { |cell, _| cell != 0 }
+      row = cols.map { |cell, col| col << offset | (Board::BITMASK_TO_NUM[cell] - 1) }
+      [row.size, *row].pack(pack_row)
+    end
+    [board.row_size].pack('C') + rows.join('')
   end
 
   def self.import_sparse_data(data)
     row_size, data = data.unpack('Ca*')
-    if row_size < 16
-      row_size.times.map do |row|
-        row_data, data = data.unpack('Z*a*')
-        line = [0] * row_size
-        col_data = row_data.unpack('C*')
+
+    offset, pack_code = row_size > 16 ? [8, 'S'] : [4, 'C']
+    col_mask = (1 << offset) - 1
+
+    row_size.times.map do |row|
+      col_count, data = data.unpack("Ca*")
+      line = [0] * row_size
+      if col_count > 0
+        *col_data, data = data.unpack("#{pack_code}#{col_count}a*")
         col_data.each do |packed_col|
-          line[packed_col >> 4] = packed_col & 0xf
+          line[packed_col >> offset] = (packed_col & col_mask) + 1
         end
-        line
       end
-    else
-      row_size.times.map do |row|
-        row_data, data = data.unpack('Z*a*')
-        line = [0] * row_size
-        col_data = row_data.unpack('S*')
-        col_data.each do |packed_col|
-          line[packed_col >> 8] = packed_col & 0xff
-        end
-        line
-      end
+      line
     end
   end
 
