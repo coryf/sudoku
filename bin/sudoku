@@ -61,9 +61,10 @@ def render
   Curses.refresh
 end
 
-def autosolve_boards(max_boards = nil)
-  start_time = Time.now
+def autosolve_boards(options = {})
   Curses.timeout = 0
+
+  start_time = Time.now
   seen_count = 0
   solved_count = 0
   boards_per_sec = 0
@@ -71,11 +72,11 @@ def autosolve_boards(max_boards = nil)
   updates_per_sec = 2
   duration = 0.0
   do_render = true
+
   loop do
     seen_count += 1
-    while @board.iterate_solution
-      #render
-    end
+
+    @board.solve
 
     solved_count += 1 if @board.solved?
     percent_solved = (solved_count * 100.0 / seen_count)
@@ -94,13 +95,14 @@ def autosolve_boards(max_boards = nil)
       do_render = false
     end
 
-    break if max_boards && @view.board_number >= max_boards
+    break if options[:max_boards] && @view.board_number >= options[:max_boards]
 
     break unless board_change(1)
 
     ch = Curses.getch
     break if ch == 'q'
   end
+
   Curses.timeout = -1
 end
 
@@ -128,7 +130,7 @@ loop do
   when 'n' then board_change(1)
   when 'p' then board_change(-1)
   when 'a' then autosolve_boards
-  when 't' then autosolve_boards(500)
+  when 't' then autosolve_boards(max_boards: 500)
   when 'q' then break
   end
 end

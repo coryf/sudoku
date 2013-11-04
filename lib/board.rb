@@ -38,19 +38,7 @@ class Board
   ]
 
   def iterate_solution
-    found = nil
-    SOLVERS.each do |method, message|
-      each_position do |row, col|
-        if cell = send(method, row, col)
-          found = [row, col, cell, message]
-          break
-        end
-      end
-
-      break if found
-    end
-
-    if found
+    if found = each_solution.first
       row, col, cell, message = found
       found_cell(row, col, cell, message)
       @possibilities.cell_taken(row, col, cell)
@@ -59,6 +47,29 @@ class Board
     end
 
     !!found
+  end
+
+  def each_solution
+    return to_enum(:each_solution) unless block_given?
+
+    begin
+      found = false
+      SOLVERS.each do |method, message|
+        each_position do |row, col|
+          if cell = send(method, row, col)
+            found = true
+            yield row, col, cell, message
+          end
+        end
+      end
+    end while found
+  end
+
+  def solve
+    each_solution do |row, col, cell, _|
+      @board[row][col] = cell
+      @possibilities.cell_taken(row, col, cell)
+    end
   end
 
   def find_only_possible_cell(row, col)
