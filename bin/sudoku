@@ -97,7 +97,7 @@ def autosolve_boards(options = {})
       do_render = false
     end
 
-    break if options[:max_boards] && @view.board_number >= options[:max_boards]
+    break if options[:max_boards] && seen_count >= options[:max_boards]
 
     break unless board_change(1)
 
