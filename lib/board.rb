@@ -1,11 +1,15 @@
 require 'board_possibilities'
+require 'board_enumerators'
 
 class Board
+  include BoardEnumerators
+
   attr_reader :block_size, :row_size, :cursor, :last_message
 
-  CHAR_TO_BITMASK = Hash[32.times.map { |x| [x.to_s, 1 << (x - 1) ] }]
-  BITMASK_TO_CHAR = CHAR_TO_BITMASK.invert
-  BITMASK_TO_NUM  = Hash[BITMASK_TO_CHAR.map { |k, v| [k, v.to_i] }]
+  CHAR_TO_BITMASK   = Hash[32.times.map { |x| [x.to_s, 1 << (x - 1) ] }]
+  BITMASK_TO_CHAR   = CHAR_TO_BITMASK.invert
+  BITMASK_TO_NUM    = Hash[BITMASK_TO_CHAR.map { |k, v| [k, v.to_i] }]
+  BITCOUNT          = Hash.new { |h, k| h[k] = bitcount(k) }
 
   def initialize(data)
     @cursor = [0, 0]
@@ -19,15 +23,73 @@ class Board
     @board[row][col]
   end
 
+  def filled?
+    each_cell.all? { |cell| cell != 0 }
+  end
+
+  def correct?
+    rows_unique? && cols_unique? && blocks_unique?
+  end
+
+  def rows_unique?
+    each_row.all? do |row|
+      seen = 0
+      each_in_row(row).all? do |cell|
+        unique = (seen & cell) == 0
+        seen |= cell
+        unique
+      end
+    end
+  end
+
+  def cols_unique?
+    each_col.all? do |col|
+      seen = 0
+      each_in_col(col).all? do |cell|
+        unique = (seen & cell) == 0
+        seen |= cell
+        unique
+      end
+    end
+  end
+
+  def blocks_unique?
+    each_block.all? do |block|
+      seen = 0
+      each_in_block(*block).all? do |cell, _, _|
+        unique = (seen & cell) == 0
+        seen |= cell
+        unique
+      end
+    end
+  end
+
   def solved?
-    each_position.all? { |row, col| @board[row][col] != 0 }
+    filled? && correct?
+  end
+
+  def reduced_cell(row, col, taken, message)
+    @cursor = [row, col]
+    taken = mask_to_array(taken).join(',')
+    @last_message = "[%d, %d] #{message} %s" % [row, col, taken]
   end
 
   def found_cell(row, col, cell, message)
     @board[row][col] = cell
     @cursor = [row, col]
     @last_message = "[%d, %d] #{message} %d" % [row, col, BITMASK_TO_CHAR[cell]]
-    true
+  end
+
+  def self.bitcount(x)
+    # works up to 32bits
+    m1 = 0x55555555
+    m2 = 0x33333333
+    m4 = 0x0f0f0f0f
+    x -= (x >> 1) & m1
+    x = (x & m2) + ((x >> 2) & m2)
+    x = (x + (x >> 4)) & m4
+    x += x >> 8
+    (x + (x >> 16)) & 0x3f
   end
 
   SOLVERS = [
@@ -38,14 +100,20 @@ class Board
   ]
 
   REDUCER = [
-    :block_vector_reduction,
+    [:block_vector_reduction, 'Block vector reduction'],
+    [:matched_set_reduction, 'Matched set reduction'],
   ]
 
   def iterate_solution
-    if found = each_solution.first
-      row, col, cell, message = found
-      found_cell(row, col, cell, message)
-      @possibilities.take!(row, col, cell)
+    if found = each_solution(with_reducers: true).first
+      if found.first == :reduced
+        _, row, col, taken, message = found
+        reduced_cell(row, col, taken, message)
+      else
+        row, col, cell, message = found
+        found_cell(row, col, cell, message)
+        @possibilities.take!(row, col, cell)
+      end
     else
       @last_message = "Additional cell not found."
     end
@@ -53,8 +121,8 @@ class Board
     !!found
   end
 
-  def each_solution
-    return to_enum(:each_solution) unless block_given?
+  def each_solution(options = {})
+    return to_enum(:each_solution, options) unless block_given?
 
     loop do
       found = false
@@ -68,9 +136,16 @@ class Board
       end
 
       unless found || solved?
-        reduced = false
-        REDUCER.each { |r| break if reduced = send(r) }
-        redo if reduced
+        reduced_cell = nil
+        message = ''
+        REDUCER.each { |r, m| message = m; break if reduced_cell = send(r) }
+        if reduced_cell
+          if options[:with_reducers]
+            row, col, taken = reduced_cell
+            yield :reduced, row, col, taken, message
+          end
+          redo
+        end
       end
 
       break unless found
@@ -78,7 +153,8 @@ class Board
   end
 
   def block_vector_reduction
-    reduced = false
+    indexes = (0...@row_size).to_a
+
     each_block do |block|
       @row_availables = Hash.new(0)
       @col_availables = Hash.new(0)
@@ -96,10 +172,12 @@ class Board
         other_availables = other_availables.reduce(:|)
         exclusives = (availables ^ other_availables) & availables
         if exclusives != 0
-          ((0...@row_size).to_a - block_cols).each do |col|
+          other_cols = (indexes - block_cols)
+          other_cols.each do |col|
             if cell_empty?(row, col)
-              #logit([:row, row, col, "%09b" % availables, "%09b" % other_availables, "%09b" % exclusives, block_cols])
-              reduced ||= @possibilities.remove(row, col, exclusives)
+              if @possibilities.remove(row, col, exclusives)
+                return [row, col, exclusives]
+              end
             end
           end
         end
@@ -111,16 +189,77 @@ class Board
         other_availables = other_availables.reduce(:|)
         exclusives = (availables ^ other_availables) & availables
         if exclusives != 0
-          ((0...@row_size).to_a - block_rows).each do |row|
+          other_rows = indexes - block_rows
+          other_rows.each do |row|
             if cell_empty?(row, col)
-              #logit([:col, row, col, "%09b" % availables, "%09b" % other_availables, "%09b" % exclusives, block_rows])
-              reduced ||= @possibilities.remove(row, col, exclusives)
+              if @possibilities.remove(row, col, exclusives)
+                return [row, col, exclusives]
+              end
             end
           end
         end
       end
     end
-    reduced
+
+    nil
+  end
+
+  def matched_set_reduction
+    matches = Hash.new { |h, k| h[k] = [] }
+
+    indexes = (0...@row_size).to_a
+
+    each_position do |row, col|
+      possible = @possibilities[row, col]
+      matches[possible] << [row, col] if possible != 0
+    end
+
+    matches = matches.map { |a, positions| [BITCOUNT[a], a, positions] }.sort_by(&:first)
+    matches.each do |count, possible, positions|
+      # rows
+      @row_size.times do |row|
+        row_positions = positions.select { |r, _| row == r }
+        if row_positions.size == count
+          cols = row_positions.map(&:last)
+          other_positions = indexes - cols
+          other_positions.each do |col|
+            if @possibilities.remove(row, col, possible)
+              return [row, col, possible]
+            end
+          end
+        end
+      end
+
+      # cols
+      @row_size.times do |col|
+        col_positions = positions.select { |_, c| col == c }
+
+        if col_positions.size == count
+          rows = col_positions.map(&:first)
+          other_positions = indexes - rows
+          other_positions.each do |row|
+            if @possibilities.remove(row, col, possible)
+              return [row, col, possible]
+            end
+          end
+        end
+      end
+
+      # blocks
+      each_block do |block|
+        block_positions = positions.select { |r, c| block == block_from_position(r, c) }
+        if block_positions.size == count
+          other_positions = each_block_position(*block).to_a - block_positions
+          other_positions.each do |row, col|
+            if @possibilities.remove(row, col, possible)
+              return [row, col, possible]
+            end
+          end
+        end
+      end
+    end
+
+    nil
   end
 
   def solve
@@ -182,71 +321,10 @@ class Board
     @board[row][col] == 0
   end
 
-  def each_in_row(row)
-    @board[row].each
-  end
-
-  def each_in_col(col)
-    @board.map { |line| line[col] }
-  end
-
-  def each_block
-    return to_enum(:each_block) unless block_given?
-
-    (0...@row_size).step(@block_size) do |row|
-      (0...@row_size).step(@block_size) do |col|
-        yield [row, col]
-      end
-    end
-  end
-
   def block_from_position(row, col)
     row_start = (row / @block_size) * @block_size
     col_start = (col / @block_size) * @block_size
     [row_start, col_start]
-  end
-
-  def each_block_position(row, col)
-    return to_enum(:each_block_position, row, col).map(&:first) unless block_given?
-
-    row_start, col_start = block_from_position(row, col)
-
-    row_end = row_start + @block_size
-    col_end = col_start + @block_size
-
-    (row_start...row_end).each do |block_row|
-      (col_start...col_end).each do |block_col|
-        yield [block_row, block_col]
-      end
-    end
-  end
-
-  def each_position
-    return to_enum(:each_position) unless block_given?
-
-    @row_size.times.each do |row|
-      @row_size.times.each do |col|
-        yield [row, col]
-      end
-    end
-  end
-
-  def each_cell
-    return to_enum(:each_cell) unless block_given?
-
-    @board.each_with_index do |line, row|
-      line.each_with_index do |cell, col|
-        yield [cell, row, col]
-      end
-    end
-  end
-
-  def each_in_block(row, col)
-    return to_enum(:each_in_block, row, col).map(&:first) unless block_given?
-
-    each_block_position(row, col) do |block_row, block_col|
-      yield [@board[block_row][block_col], block_row, block_col]
-    end
   end
 
   def move(*offsets)
@@ -259,16 +337,11 @@ class Board
   end
 
   def available(row, col)
-    mask = @possibilities[row, col]
-    (0...@row_size).select { |x| mask[x] != 0 }.map(&:succ)
+    mask_to_array(@possibilities[row, col])
   end
 
-  def each_num_row
-    return to_enum(:each_num_row) unless block_given?
-
-    @board.each do |line|
-      yield line.map { |x| BITMASK_TO_NUM[x] }.each
-    end
+  def mask_to_array(mask)
+    (0...@row_size).select { |x| mask[x] != 0 }.map(&:succ)
   end
 
   private

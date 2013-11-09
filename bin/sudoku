@@ -79,8 +79,9 @@ def autosolve_boards(options = {})
     seen_count += 1
 
     @board.solve
+    solved = @board.filled? # assume that its correct
 
-    solved_count += 1 if @board.solved?
+    solved_count += 1 if solved
     percent_solved = (solved_count * 100.0 / seen_count)
     if seen_count > next_duration_update
       duration = Time.now - start_time
@@ -98,6 +99,7 @@ def autosolve_boards(options = {})
     end
 
     break if options[:max_boards] && seen_count >= options[:max_boards]
+    break if options[:unsolved_stop] && !solved
 
     break unless board_change(1)
 
@@ -134,6 +136,7 @@ loop do
   when 'p' then board_change(-1)
   when 'a' then autosolve_boards
   when 't' then autosolve_boards(max_boards: 1000)
+  when 'b' then autosolve_boards(unsolved_stop: true)
   when 'q' then break
   end
 end

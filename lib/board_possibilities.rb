@@ -25,7 +25,7 @@ class BoardPossibilities
     end
 
     @block_taken = Hash[board.each_block.map do |block|
-      [block, board.each_in_block(*block).reduce(:|)]
+      [block, board.each_in_block(*block).map(&:first).reduce(:|)]
     end]
 
     update
